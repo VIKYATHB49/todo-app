@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo List</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        .task-text.completed {
+            text-decoration: line-through;
+            color: #888;
+        }
+        .delete-btn {
+            display: none;
+            margin-left: auto;
+            color: #dc3545;
+            cursor: pointer;
+        }
+        .completed-section .delete-btn {
+            display: inline-block;
+        }
+        .edit-input {
+            display: none;
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="task-container">
+        <div class="container">
+            <h1>Todo List</h1>
+            <form action="/add" method="POST">
+                <input type="text" name="title" placeholder="Enter task" required>
+                <button type="submit">Add Task</button>
+            </form>
+
+            <!-- Incomplete Tasks -->
+            <ul id="taskList">
+                <% tasks.forEach(task => { %>
+                    <% if (!task.completed) { %>
+                        <li class="task-item" data-task-id="<%= task._id %>">
+                            <input
+                                type="checkbox"
+                                class="completed-checkbox"
+                                onchange="toggleTaskCompletion('<%= task._id %>', this.checked)"
+                            >
+                            <span
+                                class="task-text"
+                                onclick="enableEdit(this)"
+                            >
+                                <%= task.title %>
+                            </span>
+                            <input
+                                type="text"
+                                class="edit-input"
+                                value="<%= task.title %>"
+                                onblur="finishEditing('<%= task._id %>', this)"
+                                onkeypress="if (event.key === 'Enter') finishEditing('<%= task._id %>', this)"
+                            >
+                            <span class="delete-btn" onclick="deleteTask('<%= task._id %>', this)">
+                                <i class="fas fa-trash"></i>
+                            </span>
+                        </li>
+                    <% } %>
+                <% }) %>
+            </ul>
+
+            <!-- Completed Tasks -->
+            <div class="completed-section">
+                <h2>Completed Tasks</h2>
+                <ul id="completedList">
+                    <% tasks.forEach(task => { %>
+                        <% if (task.completed) { %>
+                            <li class="task-item" data-task-id="<%= task._id %>">
+                                <input
+                                    type="checkbox"
+                                    class="completed-checkbox"
+                                    onchange="toggleTaskCompletion('<%= task._id %>', this.checked)"
+                                    <%= task.completed ? 'checked' : '' %>
+                                >
+                                <span
+                                    class="task-text completed"
+                                    onclick="enableEdit(this)"
+                                >
+                                    <%= task.title %>
+                                </span>
+                                <input
+                                    type="text"
+                                    class="edit-input"
+                                    value="<%= task.title %>"
+                                    onblur="finishEditing('<%= task._id %>', this)"
+                                    onkeypress="if (event.key === 'Enter') finishEditing('<%= task._id %>', this)"
+                                >
+                                <span class="delete-btn" onclick="deleteTask('<%= task._id %>', this)">
+                                    <i class="fas fa-trash"></i>
+                                </span>
+                            </li>
+                        <% } %>
+                    <% }) %>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <%- include('partials/footer') %>
+
+    <script>
+        // Toggle task completion (instant update)
+        async function toggleTaskCompletion(taskId, completed) {
+            try {
+                const response = await fetch(`/edit/${taskId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ completed })
+                });
+
+                if (response.ok) {
+                    const taskItem = document.querySelector(`[data-task-id="${taskId}"]`);
+                    const taskText = taskItem.querySelector('.task-text');
+                    const targetList = completed ? 
+                        document.getElementById('completedList') : 
+                        document.getElementById('taskList');
+
+                    // Update styling
+                    taskText.classList.toggle('completed', completed);
+                    
+                    // Move to appropriate section
+                    taskItem.remove();
+                    targetList.appendChild(taskItem);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Delete task (instant removal)
+        async function deleteTask(taskId, element) {
+            try {
+                const response = await fetch(`/delete/${taskId}`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    element.closest('.task-item').remove();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Enable edit mode
+        function enableEdit(taskTextElement) {
+            const taskItem = taskTextElement.closest('.task-item');
+            const taskText = taskItem.querySelector('.task-text');
+            const editInput = taskItem.querySelector('.edit-input');
+
+            taskText.style.display = 'none';
+            editInput.style.display = 'block';
+            editInput.focus();
+        }
+
+        // Finish editing and update task
+        async function finishEditing(taskId, inputElement) {
+            const newText = inputElement.value.trim();
+            if (!newText) return;
+
+            try {
+                const response = await fetch(`/edit/${taskId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: newText })
+                });
+
+                if (response.ok) {
+                    const taskText = inputElement.previousElementSibling;
+                    taskText.textContent = newText;
+                    taskText.style.display = 'inline';
+                    inputElement.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
